@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 from xmodule.modulestore.django import modulestore
 
 import openedx.core.djangoapps.content.block_structure.api as api
-from openedx.core.djangoapps.content.block_structure.config import _bs_waffle_switch_name, STORAGE_BACKING_FOR_CACHE
+from openedx.core.djangoapps.content.block_structure.config import STORAGE_BACKING_FOR_CACHE, enable_for_current_request
 import openedx.core.djangoapps.content.block_structure.tasks as tasks
 import openedx.core.djangoapps.content.block_structure.store as store
 from openedx.core.lib.command_utils import (
@@ -15,8 +15,6 @@ from openedx.core.lib.command_utils import (
     validate_dependent_option,
     parse_course_keys,
 )
-from request_cache.middleware import RequestCache, func_call_cache_key
-from openedx.core.djangolib.waffle_utils import is_switch_enabled
 
 
 log = logging.getLogger(__name__)
@@ -129,7 +127,7 @@ class Command(BaseCommand):
         Generates course blocks for the given course_keys per the given options.
         """
         if options.get('with_storage'):
-            self._enable_storage()
+            enable_for_current_request(STORAGE_BACKING_FOR_CACHE)
 
         for course_key in course_keys:
             try:
@@ -148,20 +146,12 @@ class Command(BaseCommand):
         Generates course blocks for the given course_key per the given options.
         """
         if options.get('enqueue_task'):
-            action = tasks.update_course_in_cache if options.get('force_update') else tasks.get_course_in_cache
+            action = tasks.update_course_in_cache_v2 if options.get('force_update') else tasks.get_course_in_cache_v2
             task_options = {'routing_key': options['routing_key']} if options.get('routing_key') else {}
-            action.apply_async([unicode(course_key)], **task_options)
+            action.apply_async(
+                kwargs=dict(course_id=unicode(course_key), with_storage=options.get('with_storage')),
+                **task_options
+            )
         else:
             action = api.update_course_in_cache if options.get('force_update') else api.get_course_in_cache
             action(course_key)
-
-    def _enable_storage(self):
-        """
-        Enables storage backing by setting the waffle's cached value to True.
-        """
-        cache_key = func_call_cache_key(
-            is_switch_enabled.request_cached_contained_func,
-            _bs_waffle_switch_name(STORAGE_BACKING_FOR_CACHE),
-        )
-        RequestCache.get_request_cache().data[cache_key] = True
-        log.warning(u'STORAGE_BACKING_FOR_CACHE is enabled.')
