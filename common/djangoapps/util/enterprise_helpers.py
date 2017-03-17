@@ -71,6 +71,99 @@ class EnterpriseApiClient(object):
             LOGGER.exception(message)
             raise EnterpriseApiException(message)
 
+    def fetch_enterprise_learner_data(self, user):
+        """
+        Fetch information related to enterprise from the Enterprise Service.
+
+        Example:
+            fetch_enterprise_learner_data(user)
+
+        Argument:
+            user: (User) django auth user
+
+        Returns:
+            dict: {
+                "enterprise_api_response_for_learner": {
+                    "count": 1,
+                    "num_pages": 1,
+                    "current_page": 1,
+                    "results": [
+                        {
+                            "enterprise_customer": {
+                                "uuid": "cf246b88-d5f6-4908-a522-fc307e0b0c59",
+                                "name": "TestShib",
+                                "catalog": 2,
+                                "active": true,
+                                "site": {
+                                    "domain": "example.com",
+                                    "name": "example.com"
+                                },
+                                "enable_data_sharing_consent": true,
+                                "enforce_data_sharing_consent": "at_login",
+                                "enterprise_customer_users": [
+                                    1
+                                ],
+                                "branding_configuration": {
+                                    "enterprise_customer": "cf246b88-d5f6-4908-a522-fc307e0b0c59",
+                                    "logo": "https://open.edx.org/sites/all/themes/edx_open/logo.png"
+                                },
+                                "enterprise_customer_entitlements": [
+                                    {
+                                        "enterprise_customer": "cf246b88-d5f6-4908-a522-fc307e0b0c59",
+                                        "entitlement_id": 69
+                                    }
+                                ]
+                            },
+                            "user_id": 5,
+                            "user": {
+                                "username": "staff",
+                                "first_name": "",
+                                "last_name": "",
+                                "email": "staff@example.com",
+                                "is_staff": true,
+                                "is_active": true,
+                                "date_joined": "2016-09-01T19:18:26.026495Z"
+                            },
+                            "data_sharing_consent": [
+                                {
+                                    "user": 1,
+                                    "state": "enabled",
+                                    "enabled": true
+                                }
+                            ]
+                        }
+                    ],
+                    "next": null,
+                    "start": 0,
+                    "previous": null
+                }
+            }
+
+        Raises:
+            ConnectionError: requests exception "ConnectionError", raised if if ecommerce is unable to connect
+                to enterprise api server.
+            SlumberBaseException: base slumber exception "SlumberBaseException", raised if API response contains
+                http error status like 4xx, 5xx etc.
+            Timeout: requests exception "Timeout", raised if enterprise API is taking too long for returning
+                a response. This exception is raised for both connection timeout and read timeout.
+
+        """
+        api_resource_name = 'enterprise-learner'
+        endpoint = getattr(self.client, api_resource_name)
+        querystring = {'username': user.username}
+
+        try:
+            response = endpoint().get(**querystring)
+        except (HttpClientError, HttpServerError):
+            message = (
+                "An error occurred while getting EnterpriseLearner data for user {username}").format(
+                username=user.username
+            )
+            LOGGER.exception(message)
+            return None
+
+        return response
+
 
 def data_sharing_consent_required(view_func):
     """
@@ -225,3 +318,13 @@ def get_enterprise_branding_filter_param(request):
 
     """
     return request.session.get(ENTERPRISE_CUSTOMER_BRANDING_OVERRIDE_DETAILS, None)
+
+
+def get_enterprise_learner_data(user):
+    """
+    Helper Method to retrieve enterprise learner data.
+
+    Arguments:
+    * user: (User) django auth user
+    """
+    return EnterpriseApiClient().fetch_enterprise_learner_data(user=user)['results']
