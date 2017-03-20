@@ -90,7 +90,7 @@ def save_subs_to_store(subs, subs_id, item, language='en'):
     Returns: location of saved subtitles.
     """
     filedata = json.dumps(subs, indent=2)
-    filename = subs_filename(subs_id, language)
+    filename = subs_filename(subs_id, item.location, language)
     return save_to_store(filedata, filename, 'application/json', item.location)
 
 
@@ -194,7 +194,7 @@ def remove_subs_from_store(subs_id, item, lang='en'):
     """
     Remove from store, if transcripts content exists.
     """
-    filename = subs_filename(subs_id, lang)
+    filename = subs_filename(subs_id, item.location, lang)
     Transcript.delete_asset(item.location, filename)
 
 
@@ -283,7 +283,7 @@ def copy_or_rename_transcript(new_name, old_name, item, delete_old=False, user=N
     If `old_name` is not found in storage, raises `NotFoundError`.
     If `delete_old` is True, removes `old_name` files from storage.
     """
-    filename = 'subs_{0}.srt.sjson'.format(old_name)
+    filename = 'subs_{0}_{1}.srt.sjson'.format(old_name, item.location.block_id)
     content_location = StaticContent.compute_location(item.location.course_key, filename)
     transcripts = contentstore().find(content_location).data
     save_subs_to_store(json.loads(transcripts), new_name, item)
@@ -402,14 +402,14 @@ def youtube_speed_dict(item):
     return youtube_ids
 
 
-def subs_filename(subs_id, lang='en'):
+def subs_filename(subs_id, location, lang='en'):
     """
     Generate proper filename for storage.
     """
     if lang == 'en':
-        return u'subs_{0}.srt.sjson'.format(subs_id)
+        return u'subs_{0}_{1}.srt.sjson'.format(subs_id, location.block_id)
     else:
-        return u'{0}_subs_{1}.srt.sjson'.format(lang, subs_id)
+        return u'{0}_subs_{1}_{2}.srt.sjson'.format(lang, subs_id, location.block_id)
 
 
 def generate_sjson_for_all_speeds(item, user_filename, result_subs_dict, lang):
@@ -517,7 +517,7 @@ class Transcript(object):
 
         `location` is module location.
         """
-        asset_filename = subs_filename(subs_id, lang) if not filename else filename
+        asset_filename = subs_filename(subs_id, location, lang) if not filename else filename
         return Transcript.get_asset(location, asset_filename)
 
     @staticmethod

@@ -165,7 +165,7 @@ def download_transcripts(request):
         log.debug('transcripts are supported only for video" modules.')
         raise Http404
 
-    filename = 'subs_{0}.srt.sjson'.format(subs_id)
+    filename = 'subs_{0}_{1}.srt.sjson'.format(subs_id, item.location.block_id)
     content_location = StaticContent.compute_location(item.location.course_key, filename)
     try:
         sjson_transcripts = contentstore().find(content_location)
@@ -227,12 +227,13 @@ def check_transcripts(request):
 
     transcripts_presence['status'] = 'Success'
 
-    filename = 'subs_{0}.srt.sjson'.format(item.sub)
+    filename = 'subs_{0}_{1}.srt.sjson'.format(item.sub, item.location.block_id)
     content_location = StaticContent.compute_location(item.location.course_key, filename)
     try:
         local_transcripts = contentstore().find(content_location).data
         transcripts_presence['current_item_subs'] = item.sub
     except NotFoundError:
+
         pass
 
     # Check for youtube transcripts presence
@@ -241,7 +242,7 @@ def check_transcripts(request):
         transcripts_presence['is_youtube_mode'] = True
 
         # youtube local
-        filename = 'subs_{0}.srt.sjson'.format(youtube_id)
+        filename = 'subs_{0}_{1}.srt.sjson'.format(youtube_id, item.location.block_id)
         content_location = StaticContent.compute_location(item.location.course_key, filename)
         try:
             local_transcripts = contentstore().find(content_location).data
@@ -275,7 +276,7 @@ def check_transcripts(request):
     # Check for html5 local transcripts presence
     html5_subs = []
     for html5_id in videos['html5']:
-        filename = 'subs_{0}.srt.sjson'.format(html5_id)
+        filename = 'subs_{0}_{1}.srt.sjson'.format(html5_id, item.location.block_id)
         content_location = StaticContent.compute_location(item.location.course_key, filename)
         try:
             html5_subs.append(contentstore().find(content_location).data)
