@@ -160,7 +160,7 @@ class ChooseModeView(View):
             context["enterprise_name"] = enterprise_learner_data[0]['enterprise_customer']['name']
             context["username"] = request.user.username
             if organizations:
-                context["partner_names"] = 'and'.join([
+                context["partner_names"] = ' and '.join([
                     org.get('name', partner_name) for org in organizations
                 ])
 
