@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.shortcuts import redirect
 from django.utils.http import urlencode
+from django.core.cache import cache
 from edx_rest_api_client.client import EdxRestApiClient
 try:
     from enterprise import utils as enterprise_utils
@@ -18,6 +19,8 @@ except ImportError:
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.lib.token_utils import JwtBuilder
 from slumber.exceptions import HttpClientError, HttpServerError
+import hashlib
+import six
 
 
 ENTERPRISE_CUSTOMER_BRANDING_OVERRIDE_DETAILS = 'enterprise_customer_branding_override_details'
@@ -71,14 +74,15 @@ class EnterpriseApiClient(object):
             LOGGER.exception(message)
             raise EnterpriseApiException(message)
 
-    def fetch_enterprise_learner_data(self, user):
+    def fetch_enterprise_learner_data(self, site, user):
         """
         Fetch information related to enterprise from the Enterprise Service.
 
         Example:
-            fetch_enterprise_learner_data(user)
+            fetch_enterprise_learner_data(site, user)
 
         Argument:
+            site: (Site) site instance
             user: (User) django auth user
 
         Returns:
@@ -149,18 +153,27 @@ class EnterpriseApiClient(object):
 
         """
         api_resource_name = 'enterprise-learner'
-        endpoint = getattr(self.client, api_resource_name)
-        querystring = {'username': user.username}
 
-        try:
-            response = endpoint().get(**querystring)
-        except (HttpClientError, HttpServerError):
-            message = (
-                "An error occurred while getting EnterpriseLearner data for user {username}").format(
-                username=user.username
-            )
-            LOGGER.exception(message)
-            return None
+        cache_key = get_cache_key(
+            site_domain=site.domain,
+            resource=api_resource_name,
+            username=user.username
+        )
+
+        response = cache.get(cache_key)
+        if not response:
+            try:
+                endpoint = getattr(self.client, api_resource_name)
+                querystring = {'username': user.username}
+                response = endpoint().get(**querystring)
+                cache.set(cache_key, response, settings.ENTERPRISE_API_CACHE_TIMEOUT)
+            except (HttpClientError, HttpServerError) as exc:
+                message = (
+                    "An error occurred while getting EnterpriseLearner data for user {username}").format(
+                    username=user.username
+                )
+                LOGGER.exception(message)
+                return None
 
         return response
 
@@ -320,11 +333,35 @@ def get_enterprise_branding_filter_param(request):
     return request.session.get(ENTERPRISE_CUSTOMER_BRANDING_OVERRIDE_DETAILS, None)
 
 
-def get_enterprise_learner_data(user):
+def get_cache_key(**kwargs):
     """
-    Helper Method to retrieve enterprise learner data.
+    Get MD5 encoded cache key for given arguments.
+
+    Here is the format of key before MD5 encryption.
+        key1:value1__key2:value2 ...
+
+    Example:
+        >>> get_cache_key(site_domain="example.com", resource="enterprise-learner")
+        # Here is key format for above call
+        # "site_domain:example.com__resource:enterprise-learner"
+        a54349175618ff1659dee0978e3149ca
 
     Arguments:
-    * user: (User) django auth user
+        **kwargs: Key word arguments that need to be present in cache key.
+
+    Returns:
+         An MD5 encoded key uniquely identified by the key word arguments.
     """
-    return EnterpriseApiClient().fetch_enterprise_learner_data(user=user)['results']
+    key = '__'.join(['{}:{}'.format(item, value) for item, value in six.iteritems(kwargs)])
+
+    return hashlib.md5(key).hexdigest()
+
+
+def get_enterprise_learner_data(site, user):
+    """
+    Client API operation adapter/wrapper
+    """
+    if not enterprise_enabled():
+        return None
+
+    return EnterpriseApiClient().fetch_enterprise_learner_data(site=site, user=user)['results']

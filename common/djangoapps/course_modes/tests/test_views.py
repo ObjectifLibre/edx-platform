@@ -12,6 +12,7 @@ from nose.plugins.attrib import attr
 
 from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.test.utils import override_settings
 
 from lms.djangoapps.commerce.tests import test_utils as ecomm_test_utils
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
@@ -29,6 +30,7 @@ from openedx.core.djangoapps.theming.tests.test_util import with_comprehensive_t
 
 @attr(shard=3)
 @ddt.ddt
+@override_settings(ENABLE_ENTERPRISE_INTEGRATION=False)
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
 class CourseModeViewTest(UrlResetMixin, ModuleStoreTestCase):
     """
@@ -405,6 +407,7 @@ class CourseModeViewTest(UrlResetMixin, ModuleStoreTestCase):
         self.assertRedirects(response, redirect_url)
 
 
+@override_settings(ENABLE_ENTERPRISE_INTEGRATION=False)
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
 class TrackSelectionEmbargoTest(UrlResetMixin, ModuleStoreTestCase):
     """Test embargo restrictions on the track selection page. """

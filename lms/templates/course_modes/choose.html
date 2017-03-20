@@ -74,7 +74,7 @@ from openedx.core.djangolib.markup import HTML, Text
                     <header class="page-header content-main">
                         <h3 class="title">
                             % if show_enterprise_context:
-                                ${_("Welcome, {username}! You are about to enroll in {course_name} from "
+                                ${_("Welcome, {username}! You are about to enroll in {course_name}, from "
                                 "{partner_names}, sponsored by {enterprise_name}. Please select your enrollment"
                                 " information below.").format(username=username, course_name=course_name, partner_names=partner_names, enterprise_name=enterprise_name)}
                             % else:

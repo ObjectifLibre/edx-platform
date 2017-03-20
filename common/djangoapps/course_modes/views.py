@@ -26,7 +26,7 @@ from edxmako.shortcuts import render_to_response
 from openedx.core.djangoapps.embargo import api as embargo_api
 from student.models import CourseEnrollment
 from util.db import outer_atomic
-from util.enterprise_helpers import get_enterprise_learner_data, enterprise_enabled
+from util import enterprise_helpers as enterprise_api
 from util import organizations_helpers as organization_api
 
 
@@ -151,19 +151,18 @@ class ChooseModeView(View):
             "nav_hidden": True,
         }
 
-        if enterprise_enabled():
-            enterprise_learner_data = get_enterprise_learner_data(user=request.user)
-            if enterprise_learner_data:
-                organizations = organization_api.get_course_organizations(course_id=course.id)
-                context["show_enterprise_context"] = True
-                context["partner_names"] = partner_short_name = course.display_organization \
-                    if course.display_organization else course.org
-                context["enterprise_name"] = enterprise_learner_data[0]['enterprise_customer']['name']
-                context["username"] = request.user.username
-                if organizations:
-                    context["partner_names"] = ','.join([
-                        org.get('short_name', partner_short_name) for org in organizations
-                    ])
+        enterprise_learner_data = enterprise_api.get_enterprise_learner_data(site=request.site, user=request.user)
+        if enterprise_learner_data:
+            organizations = organization_api.get_course_organizations(course_id=course.id)
+            context["show_enterprise_context"] = True
+            context["partner_names"] = partner_name = course.display_organization \
+                if course.display_organization else course.org
+            context["enterprise_name"] = enterprise_learner_data[0]['enterprise_customer']['name']
+            context["username"] = request.user.username
+            if organizations:
+                context["partner_names"] = 'and'.join([
+                    org.get('name', partner_name) for org in organizations
+                ])
 
         if "verified" in modes:
             verified_mode = modes["verified"]
